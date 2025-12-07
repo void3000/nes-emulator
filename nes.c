@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <SDL2/SDL.h>
 
 #include "cartridge.h"
 #include "ppu.h"
@@ -195,17 +196,77 @@ void nes_init(struct nes_emu *nes)
 void nes_ppu_init(struct nes_emu *nes)
 {
     nes->ppu.cart = &nes->cart;
+
+    nes->ppu.cycle = 0;
+    nes->ppu.scanline = 0;
+    nes->ppu.palette_table = nes_palette32;
 }
 
 int main(int argc, char *argv[])
 {
     struct nes_emu nes;
     struct nes_cart cart;
+    uint8_t running, frame_count, ret;
+    SDL_Event event;
 
     nes_init(&nes);
-    nes_load_catridge(&nes, &cart, "roms/donkey_kong.nes");
 
-clanup:
+    ret = nes_load_catridge(&nes, &cart, "roms/donkey_kong.nes");
+    if (ret < 0)
+        goto cleanup;
+
+#define SCALE 3
+
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        fprintf(stderr, "SDL init failed: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    SDL_Window *window = SDL_CreateWindow(
+        "NES Emulator",
+        SDL_WINDOWPOS_CENTERED, 
+        SDL_WINDOWPOS_CENTERED,
+        256 * SCALE, 
+        240 * SCALE, 
+        SDL_WINDOW_SHOWN
+    );
+    
+    SDL_Renderer *renderer = SDL_CreateRenderer(
+        window, 
+        -1, 
+        SDL_RENDERER_ACCELERATED
+    );
+    SDL_Texture *texture = SDL_CreateTexture(
+        renderer,
+        SDL_PIXELFORMAT_ARGB8888, 
+        SDL_TEXTUREACCESS_STREAMING,
+        256, 
+        240
+    );
+
+    running = 1;
+    frame_count = 0;
+
+    while(running) {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT)
+                running = 0;
+        }
+
+        SDL_UpdateTexture(texture, NULL, nes.ppu.frame_buffer, 256 * sizeof(uint32_t));
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+        SDL_RenderPresent(renderer);
+
+        SDL_Delay(16);
+    }
+
+    SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+
+cleanup:
     nes_eject_catridge(NULL, &cart);
 
     return 0;
