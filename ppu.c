@@ -154,3 +154,73 @@ uint8_t nes_palette_addr_get(struct nes_ppu *ppu,  uint16_t addr)
 
     return pal;
 }
+
+void nes_ppu_pipeline_tick(struct nes_ppu *ppu)
+{
+    switch (ppu->scanline) {
+    case 0 ... 239:
+        if (ppu->cycle > 0)
+            nes_ppu_visible_scanline_tick(ppu);
+        break;
+    case 241 ... 260:
+        nes_ppu_vblank_scanline_tick(ppu);
+        break;
+    case 261:
+        nes_ppu_prerender_scanline_tick(ppu);
+        break;
+    }
+}
+
+void nes_ppu_visible_scanline_tick(struct nes_ppu *ppu)
+{
+    if (ppu->mask & 0x08)
+        // Render must happen in the order of background 
+        // first, then sprites on top.
+        nes_ppu_bkg_render(ppu);
+
+    if (ppu->mask & 0x10)
+        nes_ppu_sprite_render(ppu);
+
+    if ((ppu->mask & 0x18) == 0x18)
+        // At this point, both background and sprites
+        // have been diabled for renderinbg,so display
+        // the backdrop color as per specification.
+        nes_ppu_backdrop_render(ppu);
+}
+
+void nes_ppu_bkg_render(struct nes_ppu *ppu)
+{
+    uint32_t pixel;
+
+    ppu->frame_buffer[0] = pixel;
+}
+
+void nes_ppu_sprite_render(struct nes_ppu *ppu)
+{
+    uint32_t pixel;
+
+    ppu->frame_buffer[0] = pixel;
+}
+
+void nes_ppu_backdrop_render(struct nes_ppu *ppu)
+{
+    uint16_t x, y;
+
+    x = ppu->cycle - 1;
+    y = ppu->scanline;
+
+    if (ppu->palette_table)
+        return;
+
+	ppu->frame_buffer[NES_FRAME_BUFF_OFFSET(x, y)] = 
+        ppu->palette_table[ppu->palette[0] & 0x3F];
+}
+
+void nes_ppu_prerender_scanline_tick(struct nes_ppu *ppu)
+{
+}
+
+void nes_ppu_vblank_scanline_tick(struct nes_ppu *ppu)
+{
+}
+
