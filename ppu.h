@@ -103,11 +103,13 @@ static uint32_t nes_palette32[64] = {
 
 uint8_t nes_ppu_reg_read(struct nes_ppu *ppu, uint16_t addr);
 uint8_t nes_ppu_read(struct nes_ppu *ppu, uint16_t addr);
-uint8_t nes_palette_addr_get(struct nes_ppu *ppu,  uint16_t addr);
 
-uint16_t nes_nametable_addr_get(struct nes_ppu *ppu,  uint16_t addr);
-uint16_t nes_tile_addr_get(struct nes_ppu *ppu);
-uint16_t nes_tile_pattern_addr_get(struct nes_ppu *ppu, uint8_t tile_index);
+uint8_t nes_palette_addr_calc(struct nes_ppu *ppu,  uint16_t addr);
+
+uint16_t nes_nametable_addr_calc(struct nes_ppu *ppu,  uint16_t addr);
+uint16_t nes_tile_addr_calc(struct nes_ppu *ppu);
+uint16_t nes_tile_attr_addr_calc(struct nes_ppu *ppu);
+uint16_t nes_tile_pattern_addr_calc(struct nes_ppu *ppu, uint8_t tile_index);
 
 void nes_ppu_write(struct nes_ppu *ppu, uint16_t addr, uint8_t data);
 void nes_ppu_reg_write(struct nes_ppu *ppu, uint16_t addr, uint8_t data);

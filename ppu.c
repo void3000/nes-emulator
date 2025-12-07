@@ -11,11 +11,11 @@ uint8_t nes_ppu_read(struct nes_ppu *ppu, uint16_t addr)
         // No support for CHR RAM for now
         return ppu->cart->chr_rom[addr];
     case 0x2000 ... 0x3eff:
-        addr = nes_nametable_addr_get(ppu, addr);
+        addr = nes_nametable_addr_calc(ppu, addr);
 
         return ppu->vram[addr];
     case 0x3f00 ... 0x3fff:
-        pal = nes_palette_addr_get(ppu, addr);
+        pal = nes_palette_addr_calc(ppu, addr);
 
         return ppu->palette[pal];
     default:
@@ -34,12 +34,12 @@ void nes_ppu_write(struct nes_ppu *ppu, uint16_t addr, uint8_t data)
         // No support for CHR RAM for now
         break;
     case 0x2000 ... 0x3eff:
-        addr = nes_nametable_addr_get(ppu, addr);
+        addr = nes_nametable_addr_calc(ppu, addr);
 
         ppu->vram[addr] = data;
         break;
     case 0x3f00 ... 0x3fff:
-        pal = nes_palette_addr_get(ppu, addr);
+        pal = nes_palette_addr_calc(ppu, addr);
 
         ppu->palette[pal] = data;
     default:
@@ -119,7 +119,7 @@ void nes_ppu_reg_write(struct nes_ppu *ppu, uint16_t addr, uint8_t data)
     }
 }
 
-uint16_t nes_nametable_addr_get(struct nes_ppu *ppu,  uint16_t addr)
+uint16_t nes_nametable_addr_calc(struct nes_ppu *ppu,  uint16_t addr)
 {
     addr &= 0x2fff;             // Mirrored
 
@@ -139,7 +139,7 @@ uint16_t nes_nametable_addr_get(struct nes_ppu *ppu,  uint16_t addr)
     return addr;
 }
 
-uint8_t nes_palette_addr_get(struct nes_ppu *ppu,  uint16_t addr)
+uint8_t nes_palette_addr_calc(struct nes_ppu *ppu,  uint16_t addr)
 {
     uint8_t pal;
 
@@ -174,7 +174,7 @@ void nes_ppu_pipeline_tick(struct nes_ppu *ppu)
 void nes_ppu_visible_scanline_tick(struct nes_ppu *ppu)
 {
     if (ppu->mask & 0x08)
-        // Render must happen in the order of background 
+        // Render must happen in the order of background
         // first, then sprites on top.
         nes_ppu_bkg_render(ppu);
 
@@ -190,9 +190,53 @@ void nes_ppu_visible_scanline_tick(struct nes_ppu *ppu)
 
 void nes_ppu_bkg_render(struct nes_ppu *ppu)
 {
-    uint32_t pixel;
+    uint16_t tile_addr, attr_addr;
+    uint8_t tile_index, attr_byte;
 
-    ppu->frame_buffer[0] = pixel;
+    // The Nametable holds the tile indices for the
+    // current scanline and cycle.
+    tile_addr = nes_tile_addr_calc(ppu);
+    tile_index = nes_ppu_read(ppu, tile_addr);
+
+    // The attribute value controls which palette is
+    // assigned to each part of the background.
+    attr_addr = nes_tile_attr_addr_calc(ppu);
+    attr_byte = nes_ppu_read(ppu, attr_addr);
+}
+
+uint16_t nes_tile_addr_calc(struct nes_ppu *ppu)
+{
+    uint16_t base_addr, xt, yt;
+
+    // The selected Nametable base address
+    base_addr =  0x2000 | (ppu->ctrl & 0x03) << 10;
+
+    // We need to map screen coordinates [x, y] to Nametable
+    // coordinates [xt, yt]. We do this because the Nametable
+    // has 30 rows of 32 tileseach, and each tile is 8x8 pixels.
+    xt = (ppu->cycle - 1) >> 3;
+    yt = (ppu->scanline << 2) & 0xc0;       // Same as: (scanline >> 3) << 5
+
+    return base_addr + yt + xt;
+}
+
+uint16_t nes_tile_attr_addr_calc(struct nes_ppu *ppu)
+{
+    uint16_t base_addr, xt, yt;
+
+    // The selected Nametable base address
+    base_addr =  0x2000 | (ppu->ctrl & 0x03) << 10;
+
+    // Each attribute byte covers a 32x32 pixel area,
+    // or 4x4 tiles. Thus, we need to map screen
+    // coordinates [x, y] to attribute table coordinates
+    // [xt, yt]. Each attribute byte is located after the
+    // 960 bytes of tile indices, so we need to offset by
+    // 960 bytes.
+    xt = (ppu->cycle - 1) >> 5;
+    yt = (ppu->scanline >> 2) & 0xf8;       // Same as: (scanline >> 5) << 3
+
+    return base_addr + 0x03c0 + yt + xt;
 }
 
 void nes_ppu_sprite_render(struct nes_ppu *ppu)
