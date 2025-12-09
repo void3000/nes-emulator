@@ -187,7 +187,7 @@ void nes_init_bus(struct nes_emu *nes)
 
 void nes_init(struct nes_emu *nes)
 {
-    memset(nes->ram, 0, sizeof(nes->ram));
+    memset(nes, 0, sizeof(struct nes_emu));
 
     nes_ppu_init(nes);
     nes_init_bus(nes);
@@ -200,6 +200,8 @@ void nes_ppu_init(struct nes_emu *nes)
     nes->ppu.cycle = 0;
     nes->ppu.scanline = 0;
     nes->ppu.palette_table = nes_palette32;
+
+    memset(nes->ppu.frame_buffer, 0, sizeof(nes->ppu.frame_buffer));
 }
 
 int main(int argc, char *argv[])
@@ -211,7 +213,7 @@ int main(int argc, char *argv[])
 
     nes_init(&nes);
 
-    ret = nes_load_catridge(&nes, &cart, "roms/donkey_kong.nes");
+    ret = nes_load_catridge(&nes, &cart, "roms/tetris.nes");
     if (ret < 0)
         goto cleanup;
 
@@ -245,12 +247,30 @@ int main(int argc, char *argv[])
     );
 
     running = 1;
-    frame_count = 0;
+
+    nes.ppu.mask = 0x1e;
+
+    nes.ppu.palette[0] = 0x0F;  // Black
+    nes.ppu.palette[1] = 0x16;  // Red
+    nes.ppu.palette[2] = 0x27;  // Orange
+    nes.ppu.palette[3] = 0x30;  // White
+    nes.ppu.palette[4] = 0x0F;
+    nes.ppu.palette[5] = 0x02;  // Blue
+    nes.ppu.palette[6] = 0x1A;  // Green
+    nes.ppu.palette[7] = 0x30;
+
+    for (int i = 0; i < 32 * 30; i++) {
+        nes_ppu_write(&nes.ppu, 0x2000 + i, i % 128);
+    }
 
     while(running) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT)
                 running = 0;
+        }
+
+        for (int i = 0; i < 341 * 262; ++i) {
+            nes_ppu_tick(&nes.ppu);
         }
 
         SDL_UpdateTexture(texture, NULL, nes.ppu.frame_buffer, 256 * sizeof(uint32_t));
