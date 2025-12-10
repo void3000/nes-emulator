@@ -204,6 +204,39 @@ void nes_ppu_init(struct nes_emu *nes)
     memset(nes->ppu.frame_buffer, 0, sizeof(nes->ppu.frame_buffer));
 }
 
+static void simulate_cpu_writes(struct nes_emu *nes)
+{
+    uint16_t tiles, base;
+    uint8_t tile;
+ 
+    // Fill the first nametable (0x2000) with sequential tile
+    // indices by simulates the CPU writing to PPUADDR (0x2006)
+    // and PPUDATA (0x2007).
+    base = 0x2000;
+    tiles = 960;
+    tile = 1;
+
+    for (int i = 0; i < tiles; ++i) {
+        uint16_t addr = base + i;
+        uint8_t high = (addr >> 8) & 0xff;
+        uint8_t low = addr & 0xff;
+        nes_bus_write(&nes->bus, 0x2006, high);
+        nes_bus_write(&nes->bus, 0x2006, low);
+        nes_bus_write(&nes->bus, 0x2007, tile);
+        tile++;
+        if (tile == 0) tile = 1;
+    }
+
+    uint8_t palvals[4] = { 0x0f, 0x16, 0x27, 0x30 };
+    
+    for (int i = 0; i < 4; ++i) {
+        uint16_t addr = 0x3f00 + i;
+        nes_bus_write(&nes->bus, 0x2006, (addr >> 8) & 0xff);
+        nes_bus_write(&nes->bus, 0x2006, addr & 0xff);
+        nes_bus_write(&nes->bus, 0x2007, palvals[i]);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     struct nes_emu nes;
@@ -250,21 +283,7 @@ int main(int argc, char *argv[])
 
     nes.ppu.mask = 0x1e;
 
-    nes.ppu.palette[0] = 0x0F;  // Black
-    nes.ppu.palette[1] = 0x16;  // Red
-    nes.ppu.palette[2] = 0x27;  // Orange
-    nes.ppu.palette[3] = 0x30;  // White
-    nes.ppu.palette[4] = 0x0F;
-    nes.ppu.palette[5] = 0x02;  // Blue
-    nes.ppu.palette[6] = 0x1A;  // Green
-    nes.ppu.palette[7] = 0x30;
-
-    for (int y = 0; y < 30; y++) {
-        for (int x = 0; x < 32; x++) {
-            int idx = (y << 5) + x;
-            nes_ppu_write(&nes.ppu, 0x2000 + idx, idx);
-        }
-    }
+    simulate_cpu_writes(&nes);
 
     while(running) {
         while (SDL_PollEvent(&event)) {
