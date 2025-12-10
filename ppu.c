@@ -98,18 +98,19 @@ void nes_ppu_reg_write(struct nes_ppu *ppu, uint16_t addr, uint8_t data)
             ppu->reg.w = 1;
         }
         break;
-    case 0x2006: // TODO: scrolling
-        if (ppu->reg.w) {
-            ppu->reg.w = 0;
-        } else {
+    case 0x2006:
+        if (ppu->reg.w == 0) {
+            ppu->reg.t = (ppu->reg.t & 0x00FF) | ((data & 0x3F) << 8);
             ppu->reg.w = 1;
+        } else {
+            ppu->reg.t = (ppu->reg.t & 0xFF00) | data;
+            ppu->vram_addr = ppu->reg.t & 0x3FFF;
+            ppu->reg.w = 0;
         }
-
         break;
     case 0x2007:
         nes_ppu_write(ppu, ppu->vram_addr, data);
         ppu->vram_addr += (ppu->ctrl & 0x04) ? 0x20: 0x01;
-
         break;
     default:
         return;
