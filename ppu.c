@@ -161,6 +161,7 @@ void nes_ppu_tick(struct nes_ppu *ppu)
         ppu->cycle = 0;
         ppu->scanline++;
 
+        // NTSC supports 262 scanlines per frame
         if (ppu->scanline > 261)
             ppu->scanline = 0;
     }
@@ -173,6 +174,7 @@ void nes_ppu_pipeline_tick(struct nes_ppu *ppu)
         if (ppu->cycle >= 1 && ppu->cycle <= 256)
             nes_ppu_visible_scanline_tick(ppu);
         break;
+    // Scanlines 240 is PPU idle, so skip it
     case 241 ... 260:
         nes_ppu_vblank_scanline_tick(ppu);
         break;
@@ -333,9 +335,12 @@ void nes_ppu_backdrop_render(struct nes_ppu *ppu)
 
 void nes_ppu_prerender_scanline_tick(struct nes_ppu *ppu)
 {
+    if (ppu->cycle == 1)
+        ppu->status &= ~0x80;
 }
 
 void nes_ppu_vblank_scanline_tick(struct nes_ppu *ppu)
 {
+    if (ppu->scanline == 241 && ppu->cycle == 1)
+        ppu->status |= 0x80;
 }
-
