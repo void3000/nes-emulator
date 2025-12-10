@@ -201,27 +201,32 @@ void nes_ppu_visible_scanline_tick(struct nes_ppu *ppu)
 
 void nes_ppu_bkg_render(struct nes_ppu *ppu)
 {
-    uint16_t tile_addr, attr_addr, attr_palette, pattern_addr, pattern_data, x, y;
-    uint8_t tile_index, attr_byte, rgb_index;
-
-    // The Nametable holds the tile indices for the
-    // current scanline and cycle.
-    tile_addr = nes_tile_addr_calc(ppu);
-    tile_index = nes_ppu_read(ppu, tile_addr);
+    uint16_t tile_addr, attr_addr, palette_index, pattern_addr, pixel_index, x, y;
+    uint8_t tile_indx, attr_byte, rgb_index;
 
     // The attribute value controls which palette is
     // assigned to each part of the background.
     attr_addr = nes_tile_attr_addr_calc(ppu);
     attr_byte = nes_ppu_read(ppu, attr_addr);
  
-    attr_palette = nes_attr_palette_calc(ppu, attr_byte);
+    palette_index = nes_attr_palette_calc(ppu, attr_byte);
 
-    pattern_addr = nes_pattern_addr_calc(ppu, tile_index);
-    pattern_data = nes_pattern_data_calc(ppu, pattern_addr);
+    // The Nametable holds the tile indices for the
+    // current scanline and cycle.
+    tile_addr = nes_tile_addr_calc(ppu);
+    tile_indx = nes_ppu_read(ppu, tile_addr);
 
-    if (pattern_data)
-        rgb_index = ppu->palette[(attr_palette << 2) | pattern_data];
+    // The pattern value controls which pixels or colors
+    // from the tile are displayed on screen.
+    pattern_addr = nes_pattern_addr_calc(ppu, tile_indx);
+    pixel_index = nes_pattern_data_calc(ppu, pattern_addr);
+
+    if (pixel_index)
+        // Because we are rendering the background, it's fine to use a 4 bit
+        // offset into the palette. The last 16 entries are for the sprites.
+        rgb_index = ppu->palette[((palette_index << 2) | pixel_index) & 0x3f];
     else
+        // Backdrop color (transparent)
         rgb_index = ppu->palette[0];
 
     x = ppu->cycle - 1;
@@ -281,7 +286,7 @@ uint8_t nes_attr_palette_calc(struct nes_ppu *ppu, uint8_t attr_byte)
     return (attr_byte >> shift) & 0x03;
 }
 
-uint16_t nes_pattern_addr_calc(struct nes_ppu *ppu, uint8_t tile_index)
+uint16_t nes_pattern_addr_calc(struct nes_ppu *ppu, uint8_t tile_indx)
 {
     uint16_t base_addr;
 
@@ -290,7 +295,7 @@ uint16_t nes_pattern_addr_calc(struct nes_ppu *ppu, uint8_t tile_index)
     else
         base_addr = 0x0000;
 
-    return base_addr + tile_index << 4;
+    return base_addr + (tile_indx << 4);
 }
 
 uint16_t nes_pattern_data_calc(struct nes_ppu *ppu, uint16_t pattern_addr)
