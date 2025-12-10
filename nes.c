@@ -199,7 +199,7 @@ void nes_ppu_init(struct nes_emu *nes)
 
     nes->ppu.cycle = 0;
     nes->ppu.scanline = 0;
-    nes->ppu.palette_table = nes_palette32;
+    nes->ppu.palette_table = nes_canonical_palette;
 
     memset(nes->ppu.frame_buffer, 0, sizeof(nes->ppu.frame_buffer));
 }
@@ -259,8 +259,11 @@ int main(int argc, char *argv[])
     nes.ppu.palette[6] = 0x1A;  // Green
     nes.ppu.palette[7] = 0x30;
 
-    for (int i = 0; i < 32 * 30; i++) {
-        nes_ppu_write(&nes.ppu, 0x2000 + i, i % 128);
+    for (int y = 0; y < 30; y++) {
+        for (int x = 0; x < 32; x++) {
+            int idx = (y << 5) + x;
+            nes_ppu_write(&nes.ppu, 0x2000 + idx, idx);
+        }
     }
 
     while(running) {
